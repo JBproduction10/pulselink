@@ -108,13 +108,30 @@ export default function MapView({
                                 <Popup>
                                     <div className="text-center">
                                         <p className="font-bold text-red-900">📍 You ({userName})</p>
-                                        <p className="text-sm text-gray-600">Status: {userStatus}</p>
-                                        
+                                        <p className="text-sm text-gray-600">Status: {userStatus.toUpperCase()}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
+                                        </p>
                                     </div>
                                 </Popup>
                             </Marker>
+
+                            {/* Range circle around user */}
+                            <Circle
+                                center={[userLocation.lat, userLocation.lng]}
+                                radius={500}
+                                pathOptions={{
+                                    color: '#dc2626',
+                                    fillColor: '#dc2626',
+                                    fillOpacity: 0.1,
+                                    weight: 2,
+                                    dashArray: '5, 5',
+                                }}
+                            />
                         </>
                     )}
+
+                    
                 </MapContainer>
             </div>
         )

@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { Peer } from "../../lib/p2p";
-import type { Contact } from "../../lib/contact";
+import type { Peer } from "../lib/p2p";
+import type { Contact } from "../lib/contact";
 
 // Fix for default marker icons in React Leaflet
 const createCustomIcon = (color: string, isUser = false) => {

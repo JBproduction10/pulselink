@@ -36,11 +36,11 @@
 ## Future Enhancements
 - [ ] Real WebRTC peer connections (currently simulated)
 - [ ] Bluetooth integration for closer-range communication
-- [ ] Map view for peer and contact locations
-- [ ] Voice message support
-- [ ] Photo/image sharing
-- [ ] Battery level indicators
-- [ ] Emergency resource sharing (water, medical supplies)
+- [x] Map view for peer and contact locations
+- [x] Voice message support
+- [x] Photo/image sharing
+- [x] Battery level indicators
+- [x] Emergency resource sharing (water, medical supplies)
 - [ ] Group chat rooms
-- [ ] Encryption for secure messaging
-- [ ] Multi-language support
+- [x] Encryption for secure messaging
+- [x] Multi-language support

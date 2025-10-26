@@ -1,6 +1,6 @@
 import SimplePeer from 'simple-peer';
 
-export type MessageType = 'SOS' | 'STATUS' | 'LOCATION' | 'CHAT' | 'RELAY';
+export type MessageType = 'SOS' | 'STATUS' | 'LOCATION' | 'CHAT' | 'RELAY' | 'IMAGE' | 'VOICE' | 'RESOURCE';
 
 export interface Message {
   id: string;
@@ -14,6 +14,10 @@ export interface Message {
     lng: number;
   };
   ttl: number; // Time to live for relay messages
+  imageData?: string; // Base64 encoded image
+  audioData?: string; // Base64 encoded audio
+  resourceType?: 'water' | 'food' | 'medical' | 'shelter' | 'other';
+  resourceQuantity?: string;
 }
 
 export interface Peer {

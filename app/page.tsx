@@ -8,12 +8,18 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import { useBattery, getBatteryIcon, getBatteryColor, getBatteryPercentage } from '../lib/battery';
+import { MediaMessage } from '../components/MediaMessage';
+import { MessageDisplay } from '../components/MessageDisplay';
+import { ResourceSharing, ResourceList } from '../components/ResourceSharing';
+import { LanguageSelector } from '../components/LanguageSelector';
+import { useTranslation, setLanguage, getLanguage, type Language } from '../lib/i18n';
 
 // Dynamically import Map component to avoid SSR issues
 const MapView = dynamic(() => import('../components/Map'), {
   ssr: false,
   loading: () => (
-    <div className="h-[600px] w-full rounded-lg border-2 border-gray-300 flex items-center justify-center bg-gray-50">
+    <div className="z-0 h-[600px] w-full rounded-lg border-2 border-gray-300 flex items-center justify-center bg-gray-50">
       <p className="text-gray-500">Loading map...</p>
     </div>
   ),
@@ -28,12 +34,24 @@ export default function Home() {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers'>('sos');
+  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers' | 'resources'>('sos');
   const [messageInput, setMessageInput] = useState('');
   const [userStatus, setUserStatus] = useState<'safe' | 'help' | 'emergency'>('safe');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [newContactName, setNewContactName] = useState('');
   const [newContactRelation, setNewContactRelation] = useState('');
+  const [currentLang, setCurrentLang] = useState<Language>('en');
+  const battery = useBattery();
+  const { t } = useTranslation(currentLang);
+
+  useEffect(() => {
+    setCurrentLang(getLanguage());
+  }, []);
+
+  const handleLanguageChange = (lang: Language) => {
+    setCurrentLang(lang);
+    setLanguage(lang);
+  };
 
   useEffect(() => {
     // Check if user is already set up
@@ -137,6 +155,43 @@ export default function Home() {
     if (network && messageInput.trim()) {
       network.sendMessage('CHAT', messageInput.trim(), location || undefined);
       setMessageInput('');
+    }
+  };
+
+  const sendImage = (imageData: string, caption: string) => {
+    if (network) {
+      const msg = network.sendMessage('IMAGE', caption || 'Shared an image', location || undefined);
+      // Add image data to the message
+      const lastMsg = network.getMessages()[0];
+      if (lastMsg) {
+        (lastMsg as any).imageData = imageData;
+        setMessages([...network.getMessages()]);
+      }
+    }
+  };
+
+  const sendVoice = (audioData: string) => {
+    if (network) {
+      const msg = network.sendMessage('VOICE', 'Voice message', location || undefined);
+      // Add audio data to the message
+      const lastMsg = network.getMessages()[0];
+      if (lastMsg) {
+        (lastMsg as any).audioData = audioData;
+        setMessages([...network.getMessages()]);
+      }
+    }
+  };
+
+  const shareResource = (type: string, quantity: string, description: string) => {
+    if (network) {
+      const msg = network.sendMessage('RESOURCE', description, location || undefined);
+      // Add resource data to the message
+      const lastMsg = network.getMessages()[0];
+      if (lastMsg) {
+        (lastMsg as any).resourceType = type;
+        (lastMsg as any).resourceQuantity = quantity;
+        setMessages([...network.getMessages()]);
+      }
     }
   };
 
@@ -248,12 +303,21 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <LanguageSelector
+                currentLang={currentLang}
+                onLanguageChange={handleLanguageChange}
+              />
               <Badge variant={getStatusColor(userStatus)}>
                 {userStatus.toUpperCase()}
               </Badge>
               <Badge variant={peers.filter(p => p.status !== 'offline').length > 0 ? 'success' : 'outline'}>
-                {peers.filter(p => p.status !== 'offline').length} Peers
+                {peers.filter(p => p.status !== 'offline').length} {t('peers')}
               </Badge>
+              {battery.supported && (
+                <Badge variant="outline" className={`${getBatteryColor(battery.level, battery.charging)} bg-white`}>
+                  {getBatteryIcon(battery.level, battery.charging)} {getBatteryPercentage(battery.level)}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -266,21 +330,22 @@ export default function Home() {
             {[
               { id: 'sos', label: 'Emergency', icon: '🚨' },
               { id: 'messages', label: 'Messages', icon: '💬' },
+              { id: 'resources', label: 'Resources', icon: '📦' },
               { id: 'contacts', label: 'Contacts', icon: '❤️' },
               { id: 'map', label: 'Map', icon: '🗺️' },
               { id: 'peers', label: 'Network', icon: '👥' },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'sos' | 'messages' | 'peers' | 'contacts' | 'map')}
-                className={`flex-1 py-3 px-4 font-medium transition-colors ${
+                onClick={() => setActiveTab(tab.id as 'sos' | 'messages' | 'peers' | 'contacts' | 'map' | 'resources')}
+                className={`flex-1 py-3 px-2 sm:px-4 font-medium transition-colors text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'text-red-600 border-b-2 border-red-600'
                     : 'text-gray-600 hover:text-red-600'
                 }`}
               >
-                <span className="mr-2">{tab.icon}</span>
-                {tab.label}
+                <span className="mr-1 sm:mr-2">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -380,7 +445,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle>Send Message</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <div className="flex gap-2">
                   <Input
                     type="text"
@@ -391,6 +456,11 @@ export default function Home() {
                   />
                   <Button onClick={sendChatMessage}>Send</Button>
                 </div>
+
+                <MediaMessage
+                  onSendImage={sendImage}
+                  onSendVoice={sendVoice}
+                />
               </CardContent>
             </Card>
 
@@ -407,30 +477,8 @@ export default function Home() {
                     key={msg.id}
                     className={msg.type === 'SOS' ? 'border-2 border-red-500 bg-red-50' : ''}
                   >
-                    <CardContent className="py-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{msg.fromName}</span>
-                          <Badge variant={
-                            msg.type === 'SOS' ? 'danger' :
-                            msg.type === 'STATUS' ? 'warning' :
-                            'outline'
-                          }>
-                            {msg.type}
-                          </Badge>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(msg.timestamp)}
-                        </span>
-                      </div>
-                      <p className={msg.type === 'SOS' ? 'font-bold text-red-900' : ''}>
-                        {msg.content}
-                      </p>
-                      {msg.location && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          📍 {msg.location.lat.toFixed(4)}, {msg.location.lng.toFixed(4)}
-                        </p>
-                      )}
+                    <CardContent>
+                      <MessageDisplay message={msg} formatTime={formatTime} />
                     </CardContent>
                   </Card>
                 ))
@@ -595,6 +643,69 @@ export default function Home() {
               <CardContent className="py-4">
                 <p className="text-sm text-blue-900">
                   <strong>Note:</strong> Contact status will automatically update when they send messages through the mesh network.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Resources Tab */}
+        {activeTab === 'resources' && (
+          <div className="space-y-4">
+            <ResourceSharing onShareResource={shareResource} />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Available Resources</CardTitle>
+                <CardDescription>
+                  Resources shared by people in your area
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResourceList
+                  resources={messages.filter(m => m.type === 'RESOURCE').map(m => ({
+                    id: m.id,
+                    fromName: m.fromName,
+                    type: (m as any).resourceType || 'other',
+                    quantity: (m as any).resourceQuantity || 'Unknown',
+                    content: m.content,
+                    timestamp: m.timestamp,
+                    location: m.location,
+                  }))}
+                  formatTime={formatTime}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Map Tab */}
+        {activeTab === 'map' && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Location Map</CardTitle>
+                <CardDescription>
+                  View your location, nearby peers, and contacts on the map
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MapView
+                  userLocation={location}
+                  userName={userName}
+                  peers={peers}
+                  contacts={contacts}
+                  userStatus={userStatus}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="py-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Map Info:</strong> Your location is shown with a special marker.
+                  Peers and contacts appear based on their last known locations.
+                  The dotted circle shows a 500m radius around you.
                 </p>
               </CardContent>
             </Card>

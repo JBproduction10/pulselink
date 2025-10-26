@@ -79,7 +79,7 @@ export default function MapView({ userLocation, userName, peers, contacts, userS
   };
 
   return (
-    <div className="h-[600px] w-full rounded-lg overflow-hidden border-2 border-gray-300 relative">
+    <div className="h-[600px] z-0 w-full rounded-lg overflow-hidden border-2 border-gray-300 relative">
       <MapContainer
         center={center}
         zoom={13}

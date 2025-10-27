@@ -302,7 +302,7 @@ export default function Home() {
                 <p className="text-xs text-red-100">{userName}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end sm:flex-nowrap">
               <LanguageSelector
                 currentLang={currentLang}
                 onLanguageChange={handleLanguageChange}

@@ -14,6 +14,9 @@ import { MessageDisplay } from '../components/MessageDisplay';
 import { ResourceSharing, ResourceList } from '../components/ResourceSharing';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation, setLanguage, getLanguage, type Language } from '../lib/i18n';
+import { GroupChat } from '../components/GroupChat';
+import { BluetoothControl } from '../components/BluetoothControl';
+import { ConnectionStatus } from '../components/ConnectionStatus';
 
 // Dynamically import Map component to avoid SSR issues
 const MapView = dynamic(() => import('../components/Map'), {
@@ -34,7 +37,7 @@ export default function Home() {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers' | 'resources'>('sos');
+  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers' | 'resources' | 'groups' | 'bluetooth'>('sos');
   const [messageInput, setMessageInput] = useState('');
   const [userStatus, setUserStatus] = useState<'safe' | 'help' | 'emergency'>('safe');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -81,7 +84,8 @@ export default function Home() {
     localStorage.setItem('pulselink-userid', userId);
     localStorage.setItem('pulselink-username', name);
 
-    const p2p = new P2PNetwork(userId, name);
+    // Enable both WebRTC and simulation for better demo experience
+    const p2p = new P2PNetwork(userId, name, { useRealWebRTC: true, useSimulation: true });
     p2p.loadFromStorage();
 
     p2p.onMessage((msg: { type: string; fromName: any; content: any; }) => {
@@ -330,14 +334,16 @@ export default function Home() {
             {[
               { id: 'sos', label: 'Emergency', icon: '🚨' },
               { id: 'messages', label: 'Messages', icon: '💬' },
+              { id: 'groups', label: 'Groups', icon: '👥' },
               { id: 'resources', label: 'Resources', icon: '📦' },
               { id: 'contacts', label: 'Contacts', icon: '❤️' },
               { id: 'map', label: 'Map', icon: '🗺️' },
-              { id: 'peers', label: 'Network', icon: '👥' },
+              { id: 'peers', label: 'Network', icon: '📡' },
+              { id: 'bluetooth', label: 'Bluetooth', icon: '🔵' },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'sos' | 'messages' | 'peers' | 'contacts' | 'map' | 'resources')}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex-1 py-3 px-2 sm:px-4 font-medium transition-colors text-sm sm:text-base ${
                   activeTab === tab.id
                     ? 'text-red-600 border-b-2 border-red-600'
@@ -707,6 +713,54 @@ export default function Home() {
                   Peers and contacts appear based on their last known locations.
                   The dotted circle shows a 500m radius around you.
                 </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Groups Tab */}
+        {activeTab === 'groups' && network && (
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Group Chat Rooms</CardTitle>
+                <CardDescription>
+                  Create and join group chat rooms for coordinated emergency response
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <GroupChat userId={network.getUserId()} userName={network.getUserName()} />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="py-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Group Chat Info:</strong> Join public rooms or create private rooms with passwords.
+                  Messages are shared with all room members through the mesh network.
+                  Default rooms: Global Emergency and General Discussion.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Bluetooth Tab */}
+        {activeTab === 'bluetooth' && network && (
+          <div className="space-y-4">
+            <BluetoothControl network={network} />
+
+            <ConnectionStatus peers={peers} />
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="py-4">
+                <div className="space-y-2 text-sm text-blue-900">
+                  <p><strong>Connection Info:</strong></p>
+                  <p>• <strong>WebRTC:</strong> Real peer-to-peer connections over WiFi/cellular networks (10-100+ meters range)</p>
+                  <p>• <strong>Bluetooth:</strong> Closer-range direct device connections (10-100 meters depending on device)</p>
+                  <p>• Both methods work together to create a resilient mesh network for emergency communication</p>
+                  <p>• Note: Bluetooth requires HTTPS and may have limited browser support</p>
+                </div>
               </CardContent>
             </Card>
           </div>

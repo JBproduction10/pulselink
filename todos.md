@@ -33,14 +33,25 @@
 - Status badges and indicators
 - Location sharing integration
 
-## Future Enhancements
-- [ ] Real WebRTC peer connections (currently simulated)
-- [ ] Bluetooth integration for closer-range communication
+## Recently Completed (Latest Update)
+- [x] Real WebRTC peer connections with SimplePeer
+- [x] Bluetooth integration for closer-range communication
+- [x] Group chat rooms with public/private support
+
+## Previously Completed
 - [x] Map view for peer and contact locations
 - [x] Voice message support
 - [x] Photo/image sharing
 - [x] Battery level indicators
 - [x] Emergency resource sharing (water, medical supplies)
-- [ ] Group chat rooms
 - [x] Encryption for secure messaging
 - [x] Multi-language support
+
+## Future Enhancements
+- [ ] TURN server support for restrictive networks
+- [ ] Video/audio calls via WebRTC
+- [ ] File transfer between peers
+- [ ] Bluetooth mesh networking
+- [ ] End-to-end encryption for group chats
+- [ ] Message reactions and read receipts
+- [ ] Admin/moderator roles in group chats

@@ -27,6 +27,7 @@ declare module 'simple-peer' {
     }
 
     interface Instance {
+      connected: Instance | undefined;
       signal(data: SignalData): void;
       send(data: string | Buffer | ArrayBufferView | ArrayBuffer | Blob): void;
       destroy(err?: Error): void;

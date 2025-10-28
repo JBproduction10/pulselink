@@ -27,8 +27,11 @@ export class WebRTCManager {
   constructor(config: WebRTCConfig) {
     this.userId = config.userId;
     this.userName = config.userName;
-    // Use a fallback to local signaling server if none provided
-    this.signalingServer = config.signalingServer || 'https://pulselink-signal.glitch.me';
+    // Use local signaling server for development, can be overridden with env var
+    const defaultServer = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? 'http://localhost:3000/app/api/signal'
+      : 'https://pulselink-pink/app/api/signal';
+    this.signalingServer = config.signalingServer || defaultServer;
     this.initializeSignaling();
   }
 

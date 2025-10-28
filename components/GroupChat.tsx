@@ -286,7 +286,7 @@ export function GroupChat({ userId, userName }: GroupChatProps) {
                         <span className="text-xs opacity-70">{formatTime(msg.timestamp)}</span>
                       </div>
                     )}
-                    <p className="break-words">{msg.content}</p>
+                    <p className="wrap-break-word">{msg.content}</p>
                   </div>
                 ))}
                 <div ref={messagesEndRef} />

@@ -15,7 +15,6 @@ import { ResourceSharing, ResourceList } from '../components/ResourceSharing';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation, setLanguage, getLanguage, type Language } from '../lib/i18n';
 import { GroupChat } from '../components/GroupChat';
-import { BluetoothControl } from '../components/BluetoothControl';
 import { ConnectionStatus } from '../components/ConnectionStatus';
 
 // Dynamically import Map component to avoid SSR issues
@@ -37,7 +36,7 @@ export default function Home() {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers' | 'resources' | 'groups' | 'bluetooth'>('sos');
+  const [activeTab, setActiveTab] = useState<'sos' | 'messages' | 'contacts' | 'map' | 'peers' | 'resources' | 'groups'>('sos');
   const [messageInput, setMessageInput] = useState('');
   const [userStatus, setUserStatus] = useState<'safe' | 'help' | 'emergency'>('safe');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -84,8 +83,8 @@ export default function Home() {
     localStorage.setItem('pulselink-userid', userId);
     localStorage.setItem('pulselink-username', name);
 
-    // Enable both WebRTC and simulation for better demo experience
-    const p2p = new P2PNetwork(userId, name, { useRealWebRTC: true, useSimulation: true });
+    // Production WebRTC connections
+    const p2p = new P2PNetwork(userId, name);
     p2p.loadFromStorage();
 
     p2p.onMessage((msg: { type: string; fromName: any; content: any; }) => {
@@ -339,7 +338,6 @@ export default function Home() {
               { id: 'contacts', label: 'Contacts', icon: '❤️' },
               { id: 'map', label: 'Map', icon: '🗺️' },
               { id: 'peers', label: 'Network', icon: '📡' },
-              { id: 'bluetooth', label: 'Bluetooth', icon: '🔵' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -745,26 +743,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Bluetooth Tab */}
-        {activeTab === 'bluetooth' && network && (
-          <div className="space-y-4">
-            <BluetoothControl network={network} />
 
-            <ConnectionStatus peers={peers} />
-
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="py-4">
-                <div className="space-y-2 text-sm text-blue-900">
-                  <p><strong>Connection Info:</strong></p>
-                  <p>• <strong>WebRTC:</strong> Real peer-to-peer connections over WiFi/cellular networks (10-100+ meters range)</p>
-                  <p>• <strong>Bluetooth:</strong> Closer-range direct device connections (10-100 meters depending on device)</p>
-                  <p>• Both methods work together to create a resilient mesh network for emergency communication</p>
-                  <p>• Note: Bluetooth requires HTTPS and may have limited browser support</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

@@ -1,14 +1,14 @@
 # PulseLink - Emergency Connection Without Internet
 
-![PulseLink](https://img.shields.io/badge/Status-Active-success)
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
+![PulseLink](https://img.shields.io/badge/Status-Production--Ready-success)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-**Emergency communication app that works without internet using peer-to-peer mesh networking.**
+**Production-ready emergency communication app that works without internet using peer-to-peer WebRTC mesh networking.**
 
 ## 🚨 Overview
 
-PulseLink is a fullstack emergency communication application designed for disaster scenarios, rural areas, and situations where internet connectivity fails. It uses WebRTC-based mesh networking to enable device-to-device communication without requiring internet access.
+PulseLink is a fullstack emergency communication application designed for disaster scenarios, rural areas, and situations where internet connectivity fails. It uses production WebRTC with TURN server support to enable reliable device-to-device communication.
 
 ### Key Features
 
@@ -20,6 +20,11 @@ PulseLink is a fullstack emergency communication application designed for disast
 - 💾 **Offline Storage** - All data persists locally
 - 📱 **PWA Support** - Install as a mobile app
 - 🔔 **Push Notifications** - Alert sounds for SOS messages
+- 📁 **File Transfer** - Share files between peers (images, documents)
+- 👥 **Group Chat** - Public and private group communication
+- 🔒 **End-to-End Encryption** - Secure messaging between peers
+- 🌍 **Multi-language Support** - Available in multiple languages
+- 🗺️ **Map View** - Visualize peer and contact locations
 
 ## 🏃 Quick Start
 
@@ -65,13 +70,23 @@ Test the app using the built-in demo mode:
 
 ### Tech Stack
 
-- **Frontend**: Next.js 14, React, TypeScript
-- **Styling**: Tailwind CSS
-- **P2P Networking**: WebRTC (SimplePeer)
+- **Frontend**: Next.js 16, React 19, TypeScript
+- **Styling**: Tailwind CSS v4
+- **P2P Networking**: WebRTC with SimplePeer
 - **State Management**: React Hooks
 - **Storage**: LocalStorage API
 - **Location**: Geolocation API
 - **PWA**: Service Workers, Web App Manifest
+- **Encryption**: Web Crypto API for E2E encryption
+- **Real-time**: Socket.io for signaling server
+
+### WebRTC Configuration
+
+**Production-ready WebRTC with:**
+- Multiple STUN servers for NAT traversal
+- TURN servers for restrictive network environments
+- Automatic fallback to BroadcastChannel for local discovery
+- Optimized ICE candidate pool size
 
 ### Project Structure
 
@@ -105,11 +120,19 @@ pulselink/
 - Message persistence
 
 ### Mesh Networking
-- Automatic peer discovery
+- Production WebRTC connections
+- TURN server support for restrictive networks
 - Message relaying (up to 5 hops)
 - Distance estimation
 - Connection status monitoring
 - Offline-first architecture
+
+### File Transfer
+- Peer-to-peer file sharing
+- Chunked transfer for large files (16KB chunks)
+- Progress tracking
+- Support for all file types
+- Automatic download for received files
 
 ### Contact Management
 - Add/remove loved ones
@@ -119,11 +142,18 @@ pulselink/
 - Relationship tagging
 
 ### Message System
-- Multiple message types (SOS, Status, Chat)
+- Multiple message types (SOS, Status, Chat, File)
 - Timestamp tracking
 - Location embedding
 - Read/unread status
 - Offline queue
+- End-to-end encryption
+
+### Group Chats
+- Public and private rooms
+- Multi-user communication
+- Message history
+- Participant management
 
 ## 🔧 Configuration
 
@@ -198,21 +228,33 @@ vercel --prod
 
 ## 🐛 Known Limitations
 
-- **WebRTC Simulation**: Currently uses simulated peer connections (real WebRTC requires signaling server)
+- **Signaling Server**: Requires connection to signaling server for initial peer discovery
 - **Browser Only**: No native mobile app (yet)
-- **Range**: Limited by WebRTC/Bluetooth range
-- **Battery**: Continuous scanning drains battery
+- **Range**: Limited by WebRTC/network range
+- **Battery**: Continuous scanning may drain battery
 
 ## 🔮 Future Enhancements
 
-- [ ] Real WebRTC peer connections
-- [ ] Bluetooth Low Energy integration
-- [ ] Map view for locations
-- [ ] Voice messages
-- [ ] Photo/image sharing
-- [ ] End-to-end encryption
-- [ ] Multi-language support
-- [ ] Native mobile apps
+- [ ] Video/audio calls via WebRTC
+- [ ] Message reactions and read receipts
+- [ ] Admin/moderator roles in group chats
+- [ ] Native mobile apps (iOS/Android)
+- [ ] Custom signaling server deployment
+- [ ] Offline-first database (IndexedDB)
+
+## ✅ Production Features
+
+- ✅ Real WebRTC peer connections
+- ✅ TURN server support for restrictive networks
+- ✅ File transfer between peers
+- ✅ End-to-end encryption
+- ✅ Multi-language support
+- ✅ Map view for locations
+- ✅ Voice messages
+- ✅ Image sharing
+- ✅ Battery level indicators
+- ✅ Emergency resource sharing
+- ✅ Group chat rooms
 
 ## 🤝 Contributing
 
@@ -251,4 +293,4 @@ Built with:
 
 ---
 
-**Made for emergencies. Works without internet. Saves lives.**
+**Made for emergencies. Works without internet. Production ready. Saves lives.**

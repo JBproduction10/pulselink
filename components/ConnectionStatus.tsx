@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Wifi, Bluetooth, Users, Radio } from 'lucide-react';
+import { Wifi, Users, Radio } from 'lucide-react';
 import { Peer } from '../lib/p2p';
 
 interface ConnectionStatusProps {
@@ -12,7 +12,6 @@ interface ConnectionStatusProps {
 
 export function ConnectionStatus({ peers }: ConnectionStatusProps) {
   const webrtcPeers = peers.filter(p => p.connectionType === 'webrtc');
-  const bluetoothPeers = peers.filter(p => p.connectionType === 'bluetooth');
   const otherPeers = peers.filter(p => !p.connectionType);
 
   const getStatusColor = (status: string) => {
@@ -46,7 +45,7 @@ export function ConnectionStatus({ peers }: ConnectionStatusProps) {
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Wifi className="h-4 w-4 text-blue-500" />
-            <span className="font-medium text-sm">WebRTC Peers</span>
+            <span className="font-medium text-sm">Connected Peers</span>
             <Badge variant="outline">{webrtcPeers.length}</Badge>
           </div>
           {webrtcPeers.length > 0 ? (
@@ -69,42 +68,11 @@ export function ConnectionStatus({ peers }: ConnectionStatusProps) {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 pl-6">No WebRTC connections</p>
+            <p className="text-xs text-gray-500 pl-6">No active connections</p>
           )}
         </div>
 
-        {/* Bluetooth Connections */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Bluetooth className="h-4 w-4 text-blue-600" />
-            <span className="font-medium text-sm">Bluetooth Peers</span>
-            <Badge variant="outline">{bluetoothPeers.length}</Badge>
-          </div>
-          {bluetoothPeers.length > 0 ? (
-            <div className="space-y-1">
-              {bluetoothPeers.map((peer) => (
-                <div
-                  key={peer.id}
-                  className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(peer.status)}`} />
-                    <span>{peer.name}</span>
-                  </div>
-                  {peer.distance && (
-                    <span className="text-xs text-gray-500">
-                      {Math.round(peer.distance)}m
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-gray-500 pl-6">No Bluetooth connections</p>
-          )}
-        </div>
-
-        {/* Other Peers (Simulated) */}
+        {/* Other Peers (Discovered) */}
         {otherPeers.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">

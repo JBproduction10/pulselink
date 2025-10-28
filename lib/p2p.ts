@@ -1,9 +1,8 @@
 import SimplePeer from 'simple-peer';
 import { WebRTCManager } from '../lib/webrtc';
-import { BluetoothManager } from './bluetooth';
 import { E2EEncryption, type EncryptedMessage, type ExportedPublicKey } from './e2e-encryption';
 
-export type MessageType = 'SOS' | 'STATUS' | 'LOCATION' | 'CHAT' | 'RELAY' | 'IMAGE' | 'VOICE' | 'RESOURCE' | 'KEY_EXCHANGE';
+export type MessageType = 'SOS' | 'STATUS' | 'LOCATION' | 'CHAT' | 'RELAY' | 'IMAGE' | 'VOICE' | 'RESOURCE' | 'KEY_EXCHANGE' | 'FILE' | 'FILE_CHUNK' | 'FILE_COMPLETE';
 
 export interface Message {
   id: string;
@@ -25,6 +24,20 @@ export interface Message {
   encryptedData?: EncryptedMessage; // Encrypted message data
 }
 
+export interface FileTransfer {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  from: string;
+  fromName: string;
+  chunks: ArrayBuffer[];
+  totalChunks: number;
+  receivedChunks: number;
+  progress: number;
+  timestamp: number;
+}
+
 export interface Peer {
   id: string;
   name: string;
@@ -32,7 +45,7 @@ export interface Peer {
   lastSeen: number;
   distance?: number;
   connection?: SimplePeer.Instance;
-  connectionType?: 'webrtc' | 'bluetooth';
+  connectionType?: 'webrtc';
 }
 
 class P2PNetwork {
@@ -44,25 +57,14 @@ class P2PNetwork {
   private peerHandlers: ((peers: Peer[]) => void)[] = [];
   private seenMessages: Set<string> = new Set();
   private webrtcManager: WebRTCManager | null = null;
-  private bluetoothManager: BluetoothManager | null = null;
-  private useRealWebRTC: boolean = true;
-  private useSimulation: boolean = false;
+  private fileTransfers: Map<string, FileTransfer> = new Map();
+  private fileHandlers: ((transfer: FileTransfer) => void)[] = [];
+  private fileProgressHandlers: ((transferId: string, progress: number) => void)[] = [];
 
-  constructor(userId: string, userName: string, options?: { useRealWebRTC?: boolean; useSimulation?: boolean }) {
+  constructor(userId: string, userName: string) {
     this.userId = userId;
     this.userName = userName;
-    this.useRealWebRTC = options?.useRealWebRTC !== false;
-    this.useSimulation = options?.useSimulation || false;
-
-    if (this.useRealWebRTC) {
-      this.initializeWebRTC();
-    }
-
-    if (this.useSimulation) {
-      this.initializeSimulation();
-    }
-
-    this.initializeBluetooth();
+    this.initializeWebRTC();
   }
 
   // Initialize real WebRTC connections
@@ -110,84 +112,7 @@ class P2PNetwork {
       });
     } catch (error) {
       console.error('Failed to initialize WebRTC:', error);
-      this.useSimulation = true;
-      this.initializeSimulation();
     }
-  }
-
-  // Initialize Bluetooth for closer-range communication
-  private initializeBluetooth() {
-    try {
-      this.bluetoothManager = new BluetoothManager(this.userId);
-
-      if (!this.bluetoothManager.isBluetoothSupported()) {
-        console.log('Bluetooth not supported in this browser');
-        return;
-      }
-
-      this.bluetoothManager.onMessage((message) => {
-        // Convert Bluetooth message to our Message format
-        const msg: Message = {
-          id: `bt-${message.timestamp}-${message.from}`,
-          from: message.from,
-          fromName: message.from,
-          type: message.type as MessageType,
-          content: message.data,
-          timestamp: message.timestamp,
-          ttl: 5,
-        };
-        this.receiveMessage(msg);
-      });
-
-      this.bluetoothManager.onDeviceDiscovered((device) => {
-        console.log('Bluetooth device discovered:', device.name);
-        this.addPeer({
-          id: device.id,
-          name: device.name,
-          status: 'safe',
-          lastSeen: device.lastSeen,
-          connectionType: 'bluetooth',
-        });
-      });
-    } catch (error) {
-      console.error('Failed to initialize Bluetooth:', error);
-    }
-  }
-
-  // Fallback simulation for demo/testing
-  private initializeSimulation() {
-    if (typeof window !== 'undefined') {
-      setInterval(() => {
-        this.simulatePeerDiscovery();
-      }, 5000);
-    }
-  }
-
-  private simulatePeerDiscovery() {
-    const simulatedPeers = [
-      { id: 'peer-1', name: 'Alice Johnson', status: 'safe' as const },
-      { id: 'peer-2', name: 'Bob Smith', status: 'help' as const },
-      { id: 'peer-3', name: 'Charlie Davis', status: 'safe' as const },
-    ];
-
-    simulatedPeers.forEach(peer => {
-      if (!this.peers.has(peer.id) && Math.random() > 0.5) {
-        this.addPeer({
-          ...peer,
-          lastSeen: Date.now(),
-          distance: Math.random() * 500,
-        });
-      }
-    });
-
-    this.peers.forEach((peer, id) => {
-      if (Math.random() > 0.9) {
-        peer.status = 'offline';
-        setTimeout(() => this.peers.delete(id), 30000);
-      }
-    });
-
-    this.notifyPeerHandlers();
   }
 
   private addPeer(peer: Peer) {
@@ -215,6 +140,83 @@ class P2PNetwork {
     this.saveToStorage();
   }
 
+  async sendFile(file: File, onProgress?: (progress: number) => void): Promise<void> {
+    const transferId = `${this.userId}-${Date.now()}-${Math.random()}`;
+    const CHUNK_SIZE = 16384; // 16KB chunks for reliable transfer
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    // Send file metadata first
+    this.broadcastMessage({
+      id: transferId,
+      from: this.userId,
+      fromName: this.userName,
+      type: 'FILE',
+      content: JSON.stringify({
+        transferId,
+        fileName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        totalChunks,
+      }),
+      timestamp: Date.now(),
+      ttl: 5,
+    });
+
+    // Read and send file in chunks
+    const reader = new FileReader();
+    let currentChunk = 0;
+
+    const readNextChunk = () => {
+      const start = currentChunk * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const blob = file.slice(start, end);
+      reader.readAsArrayBuffer(blob);
+    };
+
+    reader.onload = () => {
+      if (reader.result instanceof ArrayBuffer) {
+        // Send chunk
+        this.broadcastMessage({
+          id: `${transferId}-chunk-${currentChunk}`,
+          from: this.userId,
+          fromName: this.userName,
+          type: 'FILE_CHUNK',
+          content: JSON.stringify({
+            transferId,
+            chunkIndex: currentChunk,
+            data: Array.from(new Uint8Array(reader.result as ArrayBuffer)),
+          }),
+          timestamp: Date.now(),
+          ttl: 1, // Don't relay file chunks
+        });
+
+        currentChunk++;
+        const progress = (currentChunk / totalChunks) * 100;
+
+        if (onProgress) {
+          onProgress(progress);
+        }
+
+        if (currentChunk < totalChunks) {
+          readNextChunk();
+        } else {
+          // Send completion message
+          this.broadcastMessage({
+            id: `${transferId}-complete`,
+            from: this.userId,
+            fromName: this.userName,
+            type: 'FILE_COMPLETE',
+            content: JSON.stringify({ transferId }),
+            timestamp: Date.now(),
+            ttl: 1,
+          });
+        }
+      }
+    };
+
+    readNextChunk();
+  }
+
   private broadcastMessage(message: Message) {
     // Broadcast via WebRTC
     if (this.webrtcManager) {
@@ -222,24 +224,6 @@ class P2PNetwork {
         type: 'message',
         message,
       });
-    }
-
-    // Broadcast via Bluetooth if connected
-    if (this.bluetoothManager?.isConnected()) {
-      this.bluetoothManager.sendMessage({
-        type: message.type,
-        content: message.content,
-      });
-    }
-
-    // Fallback simulation relay
-    if (this.useSimulation && message.ttl > 0) {
-      setTimeout(() => {
-        if (Math.random() > 0.3) {
-          const relayedMessage = { ...message, ttl: message.ttl - 1 };
-          // This would propagate through the network
-        }
-      }, 1000);
     }
   }
 
@@ -249,8 +233,14 @@ class P2PNetwork {
     }
 
     this.seenMessages.add(message.id);
-    this.messages.push(message);
-    this.notifyMessageHandlers(message);
+
+    // Handle file transfer messages separately
+    if (message.type === 'FILE' || message.type === 'FILE_CHUNK' || message.type === 'FILE_COMPLETE') {
+      this.handleFileMessage(message);
+    } else {
+      this.messages.push(message);
+      this.notifyMessageHandlers(message);
+    }
 
     if (message.ttl > 0) {
       const relayedMessage = { ...message, ttl: message.ttl - 1 };
@@ -260,35 +250,63 @@ class P2PNetwork {
     this.saveToStorage();
   }
 
-  // Bluetooth connection methods
-  async connectBluetooth(): Promise<boolean> {
-    if (!this.bluetoothManager) {
-      console.error('Bluetooth not initialized');
-      return false;
+  private handleFileMessage(message: Message) {
+    try {
+      const data = JSON.parse(message.content);
+
+      if (message.type === 'FILE') {
+        // Initialize file transfer
+        const transfer: FileTransfer = {
+          id: data.transferId,
+          fileName: data.fileName,
+          fileSize: data.fileSize,
+          mimeType: data.mimeType,
+          from: message.from,
+          fromName: message.fromName,
+          chunks: new Array(data.totalChunks),
+          totalChunks: data.totalChunks,
+          receivedChunks: 0,
+          progress: 0,
+          timestamp: message.timestamp,
+        };
+        this.fileTransfers.set(data.transferId, transfer);
+      } else if (message.type === 'FILE_CHUNK') {
+        const transfer = this.fileTransfers.get(data.transferId);
+        if (transfer) {
+          transfer.chunks[data.chunkIndex] = new Uint8Array(data.data).buffer;
+          transfer.receivedChunks++;
+          transfer.progress = (transfer.receivedChunks / transfer.totalChunks) * 100;
+
+          this.fileProgressHandlers.forEach(handler =>
+            handler(data.transferId, transfer.progress)
+          );
+        }
+      } else if (message.type === 'FILE_COMPLETE') {
+        const transfer = this.fileTransfers.get(data.transferId);
+        if (transfer && transfer.receivedChunks === transfer.totalChunks) {
+          // Combine all chunks into a single blob
+          const combinedBuffer = new Uint8Array(
+            transfer.chunks.reduce((acc, chunk) => acc + chunk.byteLength, 0)
+          );
+          let offset = 0;
+          for (const chunk of transfer.chunks) {
+            combinedBuffer.set(new Uint8Array(chunk), offset);
+            offset += chunk.byteLength;
+          }
+
+          const blob = new Blob([combinedBuffer], { type: transfer.mimeType });
+          const url = URL.createObjectURL(blob);
+
+          // Notify file handlers
+          this.fileHandlers.forEach(handler => handler(transfer));
+
+          // Clean up
+          setTimeout(() => this.fileTransfers.delete(data.transferId), 60000);
+        }
+      }
+    } catch (error) {
+      console.error('Error handling file message:', error);
     }
-    return await this.bluetoothManager.requestDevice();
-  }
-
-  async scanBluetoothDevices(): Promise<void> {
-    if (!this.bluetoothManager) {
-      console.error('Bluetooth not initialized');
-      return;
-    }
-    await this.bluetoothManager.scanForDevices();
-  }
-
-  disconnectBluetooth(): void {
-    if (this.bluetoothManager) {
-      this.bluetoothManager.disconnect();
-    }
-  }
-
-  isBluetoothSupported(): boolean {
-    return this.bluetoothManager?.isBluetoothSupported() || false;
-  }
-
-  isBluetoothConnected(): boolean {
-    return this.bluetoothManager?.isConnected() || false;
   }
 
   onMessage(handler: (message: Message) => void) {
@@ -314,14 +332,6 @@ class P2PNetwork {
 
   getMessages(): Message[] {
     return [...this.messages].sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  getWebRTCPeers(): Peer[] {
-    return Array.from(this.peers.values()).filter(p => p.connectionType === 'webrtc');
-  }
-
-  getBluetoothPeers(): Peer[] {
-    return Array.from(this.peers.values()).filter(p => p.connectionType === 'bluetooth');
   }
 
   private saveToStorage() {
@@ -351,9 +361,18 @@ class P2PNetwork {
     if (this.webrtcManager) {
       this.webrtcManager.disconnect();
     }
-    if (this.bluetoothManager) {
-      this.bluetoothManager.disconnect();
-    }
+  }
+
+  onFileReceived(handler: (transfer: FileTransfer) => void) {
+    this.fileHandlers.push(handler);
+  }
+
+  onFileProgress(handler: (transferId: string, progress: number) => void) {
+    this.fileProgressHandlers.push(handler);
+  }
+
+  getActiveFileTransfers(): FileTransfer[] {
+    return Array.from(this.fileTransfers.values());
   }
 }
 

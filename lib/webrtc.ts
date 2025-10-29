@@ -30,7 +30,7 @@ export class WebRTCManager {
     // Use local signaling server for development, can be overridden with env var
     const defaultServer = typeof window !== 'undefined' && window.location.hostname === 'localhost'
       ? 'http://localhost:3000/app/api/signal'
-      : 'https://pulselink-pink/app/api/signal';
+      : 'https://pulselink-ruby.vercel.app/app/api/signal';
     this.signalingServer = config.signalingServer || defaultServer;
     this.initializeSignaling();
   }

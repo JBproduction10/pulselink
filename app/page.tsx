@@ -16,6 +16,7 @@ import { LanguageSelector } from '../components/LanguageSelector';
 import { useTranslation, setLanguage, getLanguage, type Language } from '../lib/i18n';
 import { GroupChat } from '../components/GroupChat';
 import { ConnectionStatus } from '../components/ConnectionStatus';
+import { DebugConsole } from '../components/DebugConsole';
 
 // Dynamically import Map component to avoid SSR issues
 const MapView = dynamic(() => import('../components/Map'), {
@@ -745,6 +746,9 @@ export default function Home() {
 
 
       </div>
+
+      {/* Debug Console for easier troubleshooting */}
+      {isSetup && <DebugConsole />}
     </div>
   );
 }

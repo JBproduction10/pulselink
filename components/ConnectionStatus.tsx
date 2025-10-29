@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { Wifi, Users, Radio } from 'lucide-react';
+import { Wifi, Users, Radio, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Peer } from '../lib/p2p';
 
 interface ConnectionStatusProps {
@@ -11,6 +11,20 @@ interface ConnectionStatusProps {
 }
 
 export function ConnectionStatus({ peers }: ConnectionStatusProps) {
+  const [connectionMethod, setConnectionMethod] = useState<string>('Initializing...');
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    // Check if BroadcastChannel is available
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      setConnectionMethod('BroadcastChannel (Local)');
+      setIsConnected(true);
+    } else {
+      setConnectionMethod('Signaling Server');
+      // In production, check if signaling server is connected
+    }
+  }, []);
+
   const webrtcPeers = peers.filter(p => p.connectionType === 'webrtc');
   const otherPeers = peers.filter(p => !p.connectionType);
 
@@ -36,8 +50,14 @@ export function ConnectionStatus({ peers }: ConnectionStatusProps) {
           <Radio className="h-5 w-5" />
           Network Status
         </CardTitle>
-        <CardDescription>
-          Active peer connections
+        <CardDescription className="flex items-center gap-2">
+          {isConnected ? (
+            <><CheckCircle2 className="h-3 w-3 text-green-500" />
+            <span className="text-green-600">Connected via {connectionMethod}</span></>
+          ) : (
+            <><AlertCircle className="h-3 w-3 text-yellow-500" />
+            <span className="text-yellow-600">Connecting...</span></>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -68,7 +88,14 @@ export function ConnectionStatus({ peers }: ConnectionStatusProps) {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 pl-6">No active connections</p>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+              <p className="font-medium mb-1">💡 Testing Instructions:</p>
+              <ul className="list-disc list-inside space-y-0.5 ml-2">
+                <li>Open this app in multiple browser tabs</li>
+                <li>Each tab will auto-discover other tabs</li>
+                <li>Peers will appear here within 3-5 seconds</li>
+              </ul>
+            </div>
           )}
         </div>
 

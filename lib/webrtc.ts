@@ -23,21 +23,93 @@ export class WebRTCManager {
   private onDataCallbacks: ((peerId: string, data: any) => void)[] = [];
   private onPeerConnectedCallbacks: ((peerId: string) => void)[] = [];
   private onPeerDisconnectedCallbacks: ((peerId: string) => void)[] = [];
+  private broadcastChannel: BroadcastChannel | null = null;
+  private useBroadcastChannel = false;
 
   constructor(config: WebRTCConfig) {
     this.userId = config.userId;
     this.userName = config.userName;
     // Use local signaling server for development, can be overridden with env var
     const defaultServer = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:3000/app/api/signal'
-      : 'https://pulselink-ruby.vercel.app/app/api/signal';
+      ? 'http://localhost:3001' // Separate signaling server
+      : 'https://pulselink-signaling.vercel.app'; // Production signaling server
     this.signalingServer = config.signalingServer || defaultServer;
-    this.initializeSignaling();
+
+    // Try BroadcastChannel first for local connections
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      console.log('Using BroadcastChannel for local peer discovery');
+      this.useBroadcastChannel = true;
+      this.initializeBroadcastChannel();
+    } else {
+      console.log('BroadcastChannel not available, trying signaling server');
+      this.initializeSignaling();
+    }
+  }
+
+  private initializeBroadcastChannel() {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) {
+      console.error('BroadcastChannel not supported');
+      return;
+    }
+
+    try {
+      this.broadcastChannel = new BroadcastChannel('pulselink-discovery');
+      console.log('BroadcastChannel initialized successfully');
+
+      this.broadcastChannel.onmessage = (event) => {
+        const { type, from, userName, data } = event.data;
+
+        if (from === this.userId) return;
+
+        console.log('BroadcastChannel message received:', { type, from, userName });
+
+        if (type === 'announce') {
+          // Another peer is announcing
+          console.log('Peer discovered via BroadcastChannel:', from, userName);
+          if (!this.peers.has(from)) {
+            // Only the peer with smaller ID initiates to avoid duplicate connections
+            if (this.userId < from) {
+              console.log('Initiating connection to:', from);
+              this.initiateConnection(from, true);
+            }
+          }
+        } else if (type === 'signal') {
+          console.log('Received signal from:', from);
+          this.handleSignal({
+            type: data.signalType,
+            from,
+            to: this.userId,
+            data: data.signal
+          });
+        }
+      };
+
+      // Announce presence immediately and then periodically
+      const announce = () => {
+        if (this.broadcastChannel) {
+          this.broadcastChannel.postMessage({
+            type: 'announce',
+            from: this.userId,
+            userName: this.userName,
+          });
+          console.log('Announced presence via BroadcastChannel');
+        }
+      };
+
+      announce();
+      setInterval(announce, 3000); // Announce every 3 seconds
+
+    } catch (error) {
+      console.error('Failed to initialize BroadcastChannel:', error);
+      this.useBroadcastChannel = false;
+      this.initializeSignaling();
+    }
   }
 
   private initializeSignaling() {
     try {
       // Connect to signaling server
+      console.log('Connecting to signaling server:', this.signalingServer);
       this.socket = io(this.signalingServer, {
         transports: ['websocket', 'polling'],
         reconnection: true,
@@ -58,14 +130,23 @@ export class WebRTCManager {
         console.log('Disconnected from signaling server');
       });
 
+      this.socket.on('connect_error', (error) => {
+        console.error('Signaling server connection error:', error);
+        // Fallback to local peer discovery if available
+        if (!this.useBroadcastChannel && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+          console.log('Falling back to BroadcastChannel');
+          this.useBroadcastChannel = true;
+          this.initializeBroadcastChannel();
+        }
+      });
+
       this.socket.on('error', (error) => {
         console.error('Signaling server error:', error);
-        // Fallback to local peer discovery
-        this.fallbackToLocalDiscovery();
       });
 
       // Handle peer discovery
       this.socket.on('peer-discovered', (peerInfo: { userId: string; userName: string }) => {
+        console.log('Peer discovered via signaling server:', peerInfo);
         if (peerInfo.userId !== this.userId && !this.peers.has(peerInfo.userId)) {
           this.initiateConnection(peerInfo.userId, true);
         }
@@ -74,61 +155,46 @@ export class WebRTCManager {
       // Handle signaling messages
       this.socket.on('signal', (signal: SignalData) => {
         if (signal.to === this.userId) {
+          console.log('Received signal from signaling server:', signal.from);
           this.handleSignal(signal);
         }
       });
 
       // Handle peer list updates
       this.socket.on('peers-list', (peers: Array<{ userId: string; userName: string }>) => {
+        console.log('Received peers list:', peers.length, 'peers');
         peers.forEach(peer => {
           if (peer.userId !== this.userId && !this.peers.has(peer.userId)) {
-            // Don't initiate connection, wait for signaling
+            // Initiate connection to discovered peers
+            this.initiateConnection(peer.userId, true);
           }
         });
       });
 
-      // Request current peers
-      this.socket.emit('get-peers');
+      // Request current peers after connection
+      this.socket.on('connect', () => {
+        this.socket?.emit('get-peers');
+      });
+
     } catch (error) {
       console.error('Failed to connect to signaling server:', error);
-      this.fallbackToLocalDiscovery();
+      // Fallback to BroadcastChannel if available
+      if (!this.useBroadcastChannel && typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        this.useBroadcastChannel = true;
+        this.initializeBroadcastChannel();
+      }
     }
   }
 
-  private fallbackToLocalDiscovery() {
-    console.log('Using fallback local peer discovery');
-    // Implement WebRTC without a signaling server using BroadcastChannel
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      const channel = new BroadcastChannel('pulselink-discovery');
 
-      channel.onmessage = (event) => {
-        const { type, from, data } = event.data;
-
-        if (from === this.userId) return;
-
-        if (type === 'announce') {
-          // Another peer is announcing
-          if (!this.peers.has(from)) {
-            this.initiateConnection(from, true);
-          }
-        } else if (type === 'signal') {
-          this.handleSignal({ type: data.type, from, to: this.userId, data: data.signal });
-        }
-      };
-
-      // Announce presence
-      setInterval(() => {
-        channel.postMessage({
-          type: 'announce',
-          from: this.userId,
-          userName: this.userName,
-        });
-      }, 5000);
-    }
-  }
 
   private initiateConnection(peerId: string, initiator: boolean) {
-    if (this.peers.has(peerId)) return;
+    if (this.peers.has(peerId)) {
+      console.log('Already have connection to:', peerId);
+      return;
+    }
+
+    console.log('Creating peer connection to:', peerId, 'initiator:', initiator);
 
     const peer = new SimplePeer({
       initiator,
@@ -162,7 +228,9 @@ export class WebRTCManager {
     });
 
     peer.on('signal', (data) => {
-      // Send signal through signaling server
+      console.log('Peer signal event:', data.type, 'to:', peerId);
+
+      // Send signal through signaling server or BroadcastChannel
       const signal: SignalData = {
         type: data.type as 'offer' | 'answer',
         from: this.userId,
@@ -170,19 +238,21 @@ export class WebRTCManager {
         data,
       };
 
-      if (this.socket?.connected) {
+      if (this.useBroadcastChannel && this.broadcastChannel) {
+        // Use BroadcastChannel
+        console.log('Sending signal via BroadcastChannel to:', peerId);
+        this.broadcastChannel.postMessage({
+          type: 'signal',
+          from: this.userId,
+          to: peerId,
+          data: { signalType: data.type, signal: data },
+        });
+      } else if (this.socket?.connected) {
+        // Use signaling server
+        console.log('Sending signal via signaling server to:', peerId);
         this.socket.emit('signal', signal);
       } else {
-        // Use BroadcastChannel fallback
-        if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-          const channel = new BroadcastChannel('pulselink-discovery');
-          channel.postMessage({
-            type: 'signal',
-            from: this.userId,
-            to: peerId,
-            data: { type: data.type, signal: data },
-          });
-        }
+        console.warn('No signaling method available');
       }
     });
 
@@ -271,12 +341,16 @@ export class WebRTCManager {
   }
 
   disconnect() {
+    console.log('Disconnecting WebRTC manager');
     this.peers.forEach(peer => {
       peer.destroy();
     });
     this.peers.clear();
     if (this.socket) {
       this.socket.disconnect();
+    }
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
     }
   }
 }

@@ -34,31 +34,34 @@ export function DebugConsole() {
                 message.includes('Peer') ||
                 message.includes('Connected') ||
                 message.includes('Announced')) {
-                setLogs(prev => [...prev, {
+                const newLog: LogEntry = {
                     timestamp: Date.now(),
-                    type: (message.toLowerCase().includes('error') ? 'error' :
-                        message.toLowerCase().includes('connected') ? 'success' : 'info') as LogEntry['type'],
+                    type: message.toLowerCase().includes('error') ? 'error' :
+                        message.toLowerCase().includes('connected') ? 'success' : 'info',
                     message
-                }].slice(-50)); // Keep last 50 logs
+                };
+                setLogs(prev => [...prev, newLog].slice(-50)); // Keep last 50 logs
             }
         };
 
         console.warn = (...args) => {
             originalWarn(...args);
-            setLogs(prev => [...prev, {
+            const newLog: LogEntry = {
                 timestamp: Date.now(),
                 type: 'warn',
                 message: args.join(' ')
-            }].slice(-50));
+            };
+            setLogs(prev => [...prev, newLog].slice(-50));
         };
 
         console.error = (...args) => {
             originalError(...args);
-            setLogs(prev => [...prev, {
+            const newLog: LogEntry = {
                 timestamp: Date.now(),
                 type: 'error',
                 message: args.join(' ')
-            }].slice(-50));
+            };
+            setLogs(prev => [...prev, newLog].slice(-50));
         };
 
         return () => {
